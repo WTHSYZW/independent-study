@@ -1,0 +1,321 @@
+---
+title: "Jiaxing_accessibility"
+author: "Yuanzhao Wang"
+date: "11/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+options(java.parameters = "-Xmx4G")
+```
+
+```{r setup, echo=FALSE}
+library(r5r)
+library(osmextract)
+library(tidyverse)
+library(sf)
+library(ggthemes)
+library(ggspatial)
+library(tigris)
+library(wesanderson)
+library(tidytransit)
+library(osmdata)
+library(stars)
+```
+# ```{r download osm, warning = FALSE}
+# dir.create("jiaxing")
+# 
+# opq(bbox = c(119.880969607532,
+#              30.1914932622785, 
+#              121.700154482894, 
+#              31.074977995)) %>%
+#   add_osm_feature(key = 'highway') %>%
+#   osmdata_xml(file = 'jiaxing/osmdata_network.osm')
+# ```
+```{R}
+dir.create("jiaxing")
+```
+```{r dataset, message=FALSE, warning=FALSE, results='hide'}
+boundary <- st_read("C:/WEEK4/data/ad_boundary/boundary.shp")
+  school <- st_read("C:/WEEK4/data/school/school.shp") 
+  hospital <- st_read("C:/WEEK4/data/hospitals/Jiaxing_hos.shp")
+  busstop <- st_read("C:/WEEK4/data/busstop/Jiaxing_busstop.shp")
+  restaurant <- st_read("C:/WEEK4/data/restaurants/Jiaxing_res.shp")
+  greenspace <- st_read("C:/WEEK4/data/greenspace/greenspace.shp")
+  leis <- st_read("C:/WEEK4/data/leisure/yule.shp")
+  public <- st_read("C:/WEEK4/data/public_service/shenghuo.shp")
+  shopping <- st_read("C:/WEEK4/data/shopping/shopping.shp")
+  weibo <- st_read("C:/WEEK4/data/weibo_sa/weibo_sa.shp")
+  
+hospital$Id <- NULL
+restaurant$Id <- NULL
+  
+school <- school %>%
+    mutate(id = seq(1, length(school$Name)))
+restaurant <- restaurant %>%
+    mutate(id = seq(1, length(restaurant$geometry)))
+greenspace <- greenspace %>%
+    mutate(id = seq(1, length(greenspace$Name)))
+hospital <- hospital %>%
+    mutate(id = seq(1, length(hospital$geometry)))
+weibo <- weibo %>%
+    mutate(id = seq(1, length(weibo$geometry)))
+shopping <- shopping %>%
+    mutate(id = seq(1, length(shopping$geometry)))
+public <- public %>%
+    mutate(id = seq(1, length(public$geometry)))
+leis <- leis %>%
+    mutate(id = seq(1, length(leis$geometry)))
+```
+```{r, message=FALSE, warning=FALSE, results='hide'}
+jiaxing_streets <- st_read("jiaxing/osmdata_network_01.pbf", layer = "lines", quiet=TRUE)
+greenspace_points <- st_centroid(greenspace)
+
+ggplot(jiaxing_streets) +
+  geom_sf() +
+  geom_sf(data = hospital, color = "red") +
+  theme_void()
+```
+```{r CLIP, echo=FALSE}
+jiaxing_streets <- jiaxing_streets[boundary,]
+weibo_clip <- weibo[boundary,]
+```
+
+```{r build grid, echo=FALSE}
+grid <- st_sf(st_make_grid(boundary, square = FALSE,
+                           n = c(100, 100),
+                           what = "polygons")) %>% 
+  st_filter(boundary)
+
+colnames(grid) <- "geometry"
+st_geometry(grid) <- "geometry"
+
+grid <- grid %>% 
+  mutate(id = seq(1, length(grid$geometry), by = 1))
+
+
+ggplot() +
+  geom_sf(data = grid)+
+  theme_map()
+
+grid_points <- st_centroid(grid)
+ggplot() +
+  geom_sf(data = grid_points, size = 0.75) +
+  geom_sf(data = weibo_clip, color = "red") +
+  theme_map()
+```
+
+```{r, message=FALSE}
+r5r_core <- setup_r5("jiaxing", verbose = FALSE)
+
+```
+# accessibility from weibo posted to nearest green space
+```{r, warning=FALSE}
+ttm <- travel_time_matrix(r5r_core = r5r_core,
+                          origins = st_transform(x = greenspace_points, crs = "WGS84"),
+                          destinations = st_transform(x = weibo_clip, crs = "WGS84"),
+                          mode = "WALK",
+                          max_walk_dist = 1000,
+                          max_trip_duration = 480,
+                          verbose = FALSE)
+```
+
+```{r}
+tt_wide <- ttm %>%
+  pivot_wider(names_from = fromId, 
+              names_prefix = "from", values_from = travel_time) %>%
+  rename(id = toId) %>% 
+  merge(grid) %>%
+  replace(is.na(.), 999) %>%
+  rowwise() %>%
+  mutate(from_any = min(c_across(starts_with("from")), na.rm = TRUE))
+
+st_geometry(tt_wide) <- "geometry"
+```
+```{r}
+ggplot(jiaxing_streets) +
+  geom_sf() +
+  geom_sf(data = tt_wide, 
+          aes(fill = from_any), 
+          color = NA, alpha = 0.5) +
+  geom_sf(data = greenspace_points, color = "blue") +
+  scale_fill_gradient2(low = "green", mid = "yellow", high = "red", 
+                       midpoint = 30,
+        name = "Postedweibo to the\nnearest greenspace facility\n(minutes)") +
+  theme_void()
+
+```
+# accessibility from weibo posted to shopping
+```{r, warning=FALSE}
+ttm <- travel_time_matrix(r5r_core = r5r_core,
+                          origins = st_transform(x = shopping, crs = "WGS84"),
+                          destinations = st_transform(x = weibo_clip, crs = "WGS84"),
+                          mode = "WALK",
+                          max_walk_dist = 1000,
+                          max_trip_duration = 480,
+                          verbose = FALSE)
+```
+
+```{r}
+tt_wide <- ttm %>%
+  pivot_wider(names_from = fromId, 
+              names_prefix = "from", values_from = travel_time) %>%
+  rename(id = toId) %>% 
+  merge(grid) %>%
+  replace(is.na(.), 999) %>%
+  rowwise() %>%
+  mutate(from_any = min(c_across(starts_with("from")), na.rm = TRUE))
+
+st_geometry(tt_wide) <- "geometry"
+```
+```{r}
+ggplot(jiaxing_streets) +
+  geom_sf() +
+  geom_sf(data = tt_wide, 
+          aes(fill = from_any), 
+          color = NA, alpha = 0.5) +
+  geom_sf(data = shopping, color = "blue") +
+  scale_fill_gradient2(low = "green", mid = "yellow", high = "red", 
+                       midpoint = 30,
+        name = "Postedweibo to the\nnearest shopping facility\n(minutes)") +
+  theme_void()
+
+```
+
+# accessibility from weibo posted to nearest restaurant
+```{r, warning=FALSE}
+restaurant <- restaurant %>%
+  st_zm()
+ttm <- travel_time_matrix(r5r_core = r5r_core,
+                          origins = st_transform(x = restaurant, crs = "WGS84"),
+                          destinations = st_transform(x = weibo_clip, crs = "WGS84"),
+                          mode = "WALK",
+                          max_walk_dist = 1000,
+                          max_trip_duration = 480,
+                          verbose = FALSE)
+```
+
+```{r}
+tt_wide <- ttm %>%
+  pivot_wider(names_from = fromId, 
+              names_prefix = "from", values_from = travel_time) %>%
+  rename(id = toId) %>% 
+  merge(grid) %>%
+  replace(is.na(.), 999) %>%
+  rowwise() %>%
+  mutate(from_any = min(c_across(starts_with("from")), na.rm = TRUE))
+
+st_geometry(tt_wide) <- "geometry"
+```
+```{r}
+ggplot(jiaxing_streets) +
+  geom_sf() +
+  geom_sf(data = tt_wide, 
+          aes(fill = from_any), 
+          color = NA, alpha = 0.5) +
+  geom_sf(data = restaurant, color = "blue") +
+  scale_fill_gradient2(low = "green", mid = "yellow", high = "red", 
+                       midpoint = 30,
+        name = "Postedweibo to the\nnearest greenspace facility\n(minutes)") +
+  theme_void()
+
+```
+
+```{r set up accessibility grid for greenspace, message=FALSE, warning=FALSE, results='hide'}
+
+green_grid <- grid %>%
+  mutate(num_stops = lengths(st_covers(grid, greenspace_points)))
+
+green_points <- st_centroid(green_grid) %>%
+  st_transform(crs = "WGS84")
+
+ggplot() +
+  geom_sf(data = grid_points, size = 0.75) +
+  geom_sf(data = greenspace_points, color = "red") +
+  theme_map()
+
+ggplot(green_grid) +
+  geom_sf(aes(color = num_stops)) 
+
+green_access <- accessibility(r5r_core,
+                        origins = st_transform(x = green_points, crs = "WGS84"),
+                        destinations = st_transform(x = green_points, crs = "WGS84"),
+                        mode = "WALK",
+                        opportunities_colname = "num_stops",
+                        decay_function = "exponential",
+                        cutoffs = 5,
+                        departure_datetime = as.POSIXct("15-11-2021 14:00:00",
+                                 format = "%d-%m-%Y %H:%M:%S"),
+                        max_walk_dist = 500,
+                        time_window = 60,
+                        percentiles = 50,
+                        verbose = FALSE) %>%
+  mutate(id = as.numeric(from_id)) %>%
+  merge(grid)
+
+st_geometry(green_access) <- "geometry"
+
+ggplot(green_access) +
+  geom_sf(aes(fill = accessibility), color = NA) +
+  geom_sf(data = jiaxing_streets, 
+          color = "White",
+          alpha = 0.02)+
+  geom_sf(data = boundary, 
+          color = "White",
+          fill = "NA",
+          alpha = 0.5)+
+  scale_fill_viridis_c(name = "Accessiblity score") +
+  coord_sf(crs = "WGS84") +
+  theme_void()
+```
+```{r set up grid for greenspace, message=FALSE, warning=FALSE, results='hide'}
+
+weibo_grid <- grid %>%
+  mutate(num_weibo = lengths(st_covers(grid, weibo_clip)))
+
+weibo_points <- st_centroid(weibo_grid) %>%
+  st_transform(crs = "WGS84")
+
+# ggplot() +
+#   geom_sf(data = weibo_clip, size = 0.75) +
+#   geom_sf(data = greenspace_points, color = "red") +
+#   theme_map()
+# 
+# ggplot(green_grid) +
+#   geom_sf(aes(color = num_stops)) 
+
+green_access <- accessibility(r5r_core,
+                        origins = st_transform(x = greenspace_points, crs = "WGS84"),
+                        destinations = st_transform(x = weibo_points, crs = "WGS84"),
+                        mode = "WALK",
+                        opportunities_colname = "num_stops",
+                        decay_function = "exponential",
+                        cutoffs = 5,
+                        departure_datetime = as.POSIXct("15-11-2021 14:00:00",
+                                 format = "%d-%m-%Y %H:%M:%S"),
+                        max_walk_dist = 500,
+                        time_window = 60,
+                        percentiles = 50,
+                        verbose = FALSE) %>%
+  mutate(id = as.numeric(from_id)) %>%
+  merge(grid)
+
+st_geometry(green_access) <- "geometry"
+
+ggplot(green_access) +
+  geom_sf(aes(fill = accessibility), color = NA) +
+  geom_sf(data = jiaxing_streets, 
+          color = "White",
+          alpha = 0.02)+
+  geom_sf(data = boundary, 
+          color = "White",
+          fill = "NA",
+          alpha = 0.5)+
+  scale_fill_viridis_c(name = "Accessiblity score") +
+  coord_sf(crs = "WGS84") +
+  theme_void()
+```
