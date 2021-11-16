@@ -38,18 +38,19 @@ library(stars)
 # ```
 ```{R}
 dir.create("jiaxing")
+dir.create("Largefiles")
 ```
 ```{r dataset, message=FALSE, warning=FALSE, results='hide'}
-boundary <- st_read("C:/WEEK4/data/ad_boundary/boundary.shp")
-  school <- st_read("C:/WEEK4/data/school/school.shp") 
-  hospital <- st_read("C:/WEEK4/data/hospitals/Jiaxing_hos.shp")
-  busstop <- st_read("C:/WEEK4/data/busstop/Jiaxing_busstop.shp")
-  restaurant <- st_read("C:/WEEK4/data/restaurants/Jiaxing_res.shp")
-  greenspace <- st_read("C:/WEEK4/data/greenspace/greenspace.shp")
-  leis <- st_read("C:/WEEK4/data/leisure/yule.shp")
-  public <- st_read("C:/WEEK4/data/public_service/shenghuo.shp")
-  shopping <- st_read("C:/WEEK4/data/shopping/shopping.shp")
-  weibo <- st_read("C:/WEEK4/data/weibo_sa/weibo_sa.shp")
+boundary <- st_read("D:/R sets/independent-study/Largefiles/ad_boundary/boundary.shp")
+  school <- st_read("D:/R sets/independent-study/Largefiles/school/school.shp") 
+  hospital <- st_read("D:/R sets/independent-study/Largefiles/hospitals/Jiaxing_hos.shp")
+  busstop <- st_read("D:/R sets/independent-study/Largefiles/busstop/Jiaxing_busstop.shp")
+  restaurant <- st_read("D:/R sets/independent-study/Largefiles/restaurants/Jiaxing_res.shp")
+  greenspace <- st_read("D:/R sets/independent-study/Largefiles/greenspace/greenspace.shp")
+  leis <- st_read("D:/R sets/independent-study/Largefiles/leisure/yule.shp")
+  public <- st_read("D:/R sets/independent-study/Largefiles/public_service/shenghuo.shp")
+  shopping <- st_read("D:/R sets/independent-study/Largefiles/shopping/shopping.shp")
+  weibo <- st_read("D:/R sets/independent-study/Largefiles/weibo_sa/weibo_sa.shp")
   
 hospital$Id <- NULL
 restaurant$Id <- NULL
@@ -108,7 +109,7 @@ ggplot() +
   geom_sf(data = weibo_clip, color = "red") +
   theme_map()
 ```
-
+# run r5r
 ```{r, message=FALSE}
 r5r_core <- setup_r5("jiaxing", verbose = FALSE)
 
