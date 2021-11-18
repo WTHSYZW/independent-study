@@ -25,6 +25,7 @@ library(wesanderson)
 library(tidytransit)
 library(osmdata)
 library(stars)
+library(irr)
 ```
 # ```{r download osm, warning = FALSE}
 # dir.create("jiaxing")
@@ -51,7 +52,7 @@ boundary <- st_read("D:/R sets/independent-study/Largefiles/ad_boundary/boundary
   public <- st_read("D:/R sets/independent-study/Largefiles/public_service/shenghuo.shp")
   shopping <- st_read("D:/R sets/independent-study/Largefiles/shopping/shopping.shp")
   weibo <- st_read("D:/R sets/independent-study/Largefiles/weibo_sa/weibo_sa.shp")
-  
+
 hospital$Id <- NULL
 restaurant$Id <- NULL
   
@@ -319,4 +320,19 @@ ggplot(green_access) +
   scale_fill_viridis_c(name = "Accessiblity score") +
   coord_sf(crs = "WGS84") +
   theme_void()
+```
+
+# Inter-rater reliability
+```{r read csv, message=FALSE, warning=FALSE, results='hide'}
+reliability <- read_csv("D:/R sets/independent-study/reliability_test.csv")
+```
+
+# IPercentage agreement
+```{r, message=FALSE, warning=FALSE, results='hide'}
+ratings <- reliability %>% select(lei, YZ, TW)
+agree(ratings)
+```
+```{r, message=FALSE, warning=FALSE, results='hide'}
+ratings_ai <- reliability %>% select(AI, lei)
+kappa2(ratings_ai)
 ```
