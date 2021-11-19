@@ -13,45 +13,46 @@ knitr::opts_chunk$set(echo = TRUE)
 options(java.parameters = "-Xmx4G")
 ```
 
-```{r setup, echo=FALSE}
+Load libraries
+
+```{r setup, message=FALSE}
 library(r5r)
-library(osmextract)
 library(tidyverse)
 library(sf)
-library(ggthemes)
-library(ggspatial)
-library(tigris)
-library(wesanderson)
-library(tidytransit)
-library(osmdata)
-library(stars)
 library(irr)
+library(ggthemes)
 ```
-# ```{r download osm, warning = FALSE}
-# dir.create("jiaxing")
-# 
-# opq(bbox = c(119.880969607532,
-#              30.1914932622785, 
-#              121.700154482894, 
-#              31.074977995)) %>%
-#   add_osm_feature(key = 'highway') %>%
-#   osmdata_xml(file = 'jiaxing/osmdata_network.osm')
-# ```
-```{R}
-dir.create("jiaxing")
-dir.create("Largefiles")
-```
+
+
+Load spatial datasets and add ID columns
+
 ```{r dataset, message=FALSE, warning=FALSE, results='hide'}
-boundary <- st_read("D:/R sets/independent-study/Largefiles/ad_boundary/boundary.shp")
-  school <- st_read("D:/R sets/independent-study/Largefiles/school/school.shp") 
-  hospital <- st_read("D:/R sets/independent-study/Largefiles/hospitals/Jiaxing_hos.shp")
-  busstop <- st_read("D:/R sets/independent-study/Largefiles/busstop/Jiaxing_busstop.shp")
-  restaurant <- st_read("D:/R sets/independent-study/Largefiles/restaurants/Jiaxing_res.shp")
-  greenspace <- st_read("D:/R sets/independent-study/Largefiles/greenspace/greenspace.shp")
-  leis <- st_read("D:/R sets/independent-study/Largefiles/leisure/yule.shp")
-  public <- st_read("D:/R sets/independent-study/Largefiles/public_service/shenghuo.shp")
-  shopping <- st_read("D:/R sets/independent-study/Largefiles/shopping/shopping.shp")
-  weibo <- st_read("D:/R sets/independent-study/Largefiles/weibo_sa/weibo_sa.shp")
+boundary <- st_read("Largefiles/ad_boundary/boundary.shp")
+
+school <- st_read("Largefiles/school/school.shp") %>% 
+  st_transform("WGS84") 
+
+hospital <- st_read("Largefiles/hospitals/Jiaxing_hos.shp") %>% 
+  st_transform("WGS84")
+
+busstop <- st_read("Largefiles/busstop/Jiaxing_busstop.shp") %>% 
+  st_transform("WGS84")
+
+restaurant <- st_read("Largefiles/restaurants/Jiaxing_res.shp") %>% 
+  st_transform("WGS84")
+  
+greenspace <- st_read("Largefiles/greenspace/greenspace.shp") %>% 
+  st_transform("WGS84")
+
+leis <- st_read("Largefiles/leisure/yule.shp") %>% 
+  st_transform("WGS84")
+
+public <- st_read("Largefiles/public_service/shenghuo.shp") %>% 
+  st_transform("WGS84")
+  
+shopping <- st_read("Largefiles/shopping/shopping.shp")
+  
+weibo <- st_read("Largefiles/weibo_sa/weibo_sa.shp")
 
 hospital$Id <- NULL
 restaurant$Id <- NULL
@@ -73,6 +74,9 @@ public <- public %>%
 leis <- leis %>%
     mutate(id = seq(1, length(leis$geometry)))
 ```
+
+Plot street network with hospital locations 
+
 ```{r, message=FALSE, warning=FALSE, results='hide'}
 jiaxing_streets <- st_read("jiaxing/osmdata_network_01.pbf", layer = "lines", quiet=TRUE)
 greenspace_points <- st_centroid(greenspace)
@@ -82,10 +86,15 @@ ggplot(jiaxing_streets) +
   geom_sf(data = hospital, color = "red") +
   theme_void()
 ```
+
+Clip street network and layer of Weibo posts to city boundary
+
 ```{r CLIP, echo=FALSE}
 jiaxing_streets <- jiaxing_streets[boundary,]
 weibo_clip <- weibo[boundary,]
 ```
+
+Create grid
 
 ```{r build grid, echo=FALSE}
 grid <- st_sf(st_make_grid(boundary, square = FALSE,
@@ -110,12 +119,67 @@ ggplot() +
   geom_sf(data = weibo_clip, color = "red") +
   theme_map()
 ```
+
+get number of each type of destination in each grid cell
+
+```{r}
+grid <- grid %>%
+  mutate(num_restaurant = lengths(st_covers(grid, restaurant)))
+
+grid_points <- st_centroid(grid)
+
+```
+
+
 # run r5r
+
 ```{r, message=FALSE}
 r5r_core <- setup_r5("jiaxing", verbose = FALSE)
 
 ```
-# accessibility from weibo posted to nearest green space
+
+# accessibility from weibo posted to nearest restaurant
+
+```{r, message=FALSE, results='hide'}
+restaurant_access <- accessibility(r5r_core,
+                                   origins = weibo_clip,
+                                   destinations = grid_points,
+                                   opportunities_colname = "num_restaurant",
+                                   mode = "WALK",
+                                   decay_function = "logistic",
+                                   cutoffs = 15,
+                                   verbose = FALSE,
+                                   progress = FALSE) %>%
+  rename("restaurant_access" = "accessibility") %>%
+  mutate(id = as.numeric(from_id)) %>%
+  select("id", "restaurant_access")
+  
+
+weibo_clip <- weibo_clip %>%
+  left_join(restaurant_access)
+```
+
+```{r}
+ggplot(weibo_clip) +
+  geom_sf(aes(color = restaurant_access), size = 0.1) +
+  scale_color_viridis_c() +
+  theme_map()
+```
+
+```{r}
+ggplot(weibo_clip) +
+  geom_sf(aes(color = positive_p), size = 0.1) +
+  scale_color_viridis_c() +
+  theme_map()
+```
+
+```{r}
+model <- lm(positive_p ~ restaurant_access, data = weibo_clip)
+
+summary(model)
+```
+
+
 ```{r, warning=FALSE}
 ttm <- travel_time_matrix(r5r_core = r5r_core,
                           origins = st_transform(x = greenspace_points, crs = "WGS84"),
@@ -125,6 +189,7 @@ ttm <- travel_time_matrix(r5r_core = r5r_core,
                           max_trip_duration = 480,
                           verbose = FALSE)
 ```
+
 
 ```{r}
 tt_wide <- ttm %>%
@@ -324,7 +389,7 @@ ggplot(green_access) +
 
 # Inter-rater reliability
 ```{r read csv, message=FALSE, warning=FALSE, results='hide'}
-reliability <- read_csv("D:/R sets/independent-study/reliability_test.csv")
+reliability <- read_csv("reliability_test.csv")
 ```
 
 # IPercentage agreement
