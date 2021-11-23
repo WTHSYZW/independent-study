@@ -124,7 +124,14 @@ get number of each type of destination in each grid cell
 
 ```{r}
 grid <- grid %>%
-  mutate(num_restaurant = lengths(st_covers(grid, restaurant)))
+  mutate(num_restaurant = lengths(st_covers(grid, restaurant))) %>%
+  mutate(num_school = lengths(st_covers(grid, school)))%>%
+  mutate(num_hospital = lengths(st_covers(grid, hospital)))%>%
+  mutate(num_busstop = lengths(st_covers(grid, busstop)))%>%
+  mutate(num_greenspace = lengths(st_covers(grid, greenspace_points)))%>%
+  mutate(num_leis = lengths(st_covers(grid, leis)))%>%
+  mutate(num_public = lengths(st_covers(grid, public)))%>%
+  mutate(num_shopping = lengths(st_covers(grid, shopping)))
 
 grid_points <- st_centroid(grid)
 
@@ -148,8 +155,7 @@ restaurant_access <- accessibility(r5r_core,
                                    mode = "WALK",
                                    decay_function = "logistic",
                                    cutoffs = 15,
-                                   verbose = FALSE,
-                                   progress = FALSE) %>%
+                                   verbose = FALSE) %>%
   rename("restaurant_access" = "accessibility") %>%
   mutate(id = as.numeric(from_id)) %>%
   select("id", "restaurant_access")
@@ -179,7 +185,134 @@ model <- lm(positive_p ~ restaurant_access, data = weibo_clip)
 summary(model)
 ```
 
+# accessibility from weibo posted to other ficilities
 
+```{r, message=FALSE, results='hide'}
+school_access <- accessibility(r5r_core,
+                                   origins = weibo_clip,
+                                   destinations = grid_points,
+                                   opportunities_colname = "num_school",
+                                   mode = "WALK",
+                                   decay_function = "logistic",
+                                   cutoffs = 15,
+                                   verbose = FALSE) %>%
+  rename("school_access" = "accessibility") %>%
+  mutate(id = as.numeric(from_id)) %>%
+  select("id", "school_access")
+  
+
+weibo_clip <- weibo_clip %>%
+  left_join(school_access)
+
+hospital_access <- accessibility(r5r_core,
+                                   origins = weibo_clip,
+                                   destinations = grid_points,
+                                   opportunities_colname = "num_hospital",
+                                   mode = "WALK",
+                                   decay_function = "logistic",
+                                   cutoffs = 15,
+                                   verbose = FALSE) %>%
+  rename("hospital_access" = "accessibility") %>%
+  mutate(id = as.numeric(from_id)) %>%
+  select("id", "hospital_access")
+  
+
+weibo_clip <- weibo_clip %>%
+  left_join(hospital_access)
+
+busstop_access <- accessibility(r5r_core,
+                                   origins = weibo_clip,
+                                   destinations = grid_points,
+                                   opportunities_colname = "num_busstop",
+                                   mode = "WALK",
+                                   decay_function = "logistic",
+                                   cutoffs = 15,
+                                   verbose = FALSE) %>%
+  rename("busstop_access" = "accessibility") %>%
+  mutate(id = as.numeric(from_id)) %>%
+  select("id", "busstop_access")
+  
+
+weibo_clip <- weibo_clip %>%
+  left_join(busstop_access)
+
+greenspace_access <- accessibility(r5r_core,
+                                   origins = weibo_clip,
+                                   destinations = grid_points,
+                                   opportunities_colname = "num_greenspace",
+                                   mode = "WALK",
+                                   decay_function = "logistic",
+                                   cutoffs = 15,
+                                   verbose = FALSE) %>%
+  rename("greenspace_access" = "accessibility") %>%
+  mutate(id = as.numeric(from_id)) %>%
+  select("id", "greenspace_access")
+  
+
+weibo_clip <- weibo_clip %>%
+  left_join(greenspace_access)
+
+leis_access <- accessibility(r5r_core,
+                                   origins = weibo_clip,
+                                   destinations = grid_points,
+                                   opportunities_colname = "num_leis",
+                                   mode = "WALK",
+                                   decay_function = "logistic",
+                                   cutoffs = 15,
+                                   verbose = FALSE) %>%
+  rename("leis_access" = "accessibility") %>%
+  mutate(id = as.numeric(from_id)) %>%
+  select("id", "leis_access")
+  
+
+weibo_clip <- weibo_clip %>%
+  left_join(leis_access)
+
+public_access <- accessibility(r5r_core,
+                                   origins = weibo_clip,
+                                   destinations = grid_points,
+                                   opportunities_colname = "num_public",
+                                   mode = "WALK",
+                                   decay_function = "logistic",
+                                   cutoffs = 15,
+                                   verbose = FALSE) %>%
+  rename("public_access" = "accessibility") %>%
+  mutate(id = as.numeric(from_id)) %>%
+  select("id", "public_access")
+  
+
+weibo_clip <- weibo_clip %>%
+  left_join(public_access)
+
+shopping_access <- accessibility(r5r_core,
+                                   origins = weibo_clip,
+                                   destinations = grid_points,
+                                   opportunities_colname = "num_shopping",
+                                   mode = "WALK",
+                                   decay_function = "logistic",
+                                   cutoffs = 15,
+                                   verbose = FALSE) %>%
+  rename("shopping_access" = "accessibility") %>%
+  mutate(id = as.numeric(from_id)) %>%
+  select("id", "shopping_access")
+  
+
+weibo_clip <- weibo_clip %>%
+  left_join(shopping_access)
+```
+```{r}
+full_model <- lm(positive_p ~ restaurant_access + school_access + hospital_access + busstop_access + greenspace_access + leis_access + public_access + shopping_access, data = weibo_clip)
+
+summary(full_model)
+```
+# ```{r}
+# weibo_clip <- weibo_clip %>%
+#  mutate(log_greenspace = log(greenspace_access), base = 2)
+# 
+# full_model2 <- lm(positive_p ~ restaurant_access + school_access + hospital_access + busstop_access + log_greenspace + leis_access + public_access + shopping_access, data = weibo_clip)
+# 
+# summary(full_model2)
+# ```
 
 # Inter-rater reliability
 ```{r read csv, message=FALSE, warning=FALSE, results='hide'}
