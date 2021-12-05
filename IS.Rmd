@@ -222,6 +222,71 @@ ggplot(fit, aes(x = threshold, y = fit)) +
   geom_point() +
   theme_bw()
 ```
+# accessibility from weibo posted to greenspace
+
+This will add five columns to weibo_clip:
+
+greenspace_access_5: The number of restaurants within a 5-minute walk.
+greenspace_access_10: The number of restaurants within a 10-minute walk.
+greenspace_access_15: The number of restaurants within a 15-minute walk.
+greenspace_access_20: The number of restaurants within a 15-minute walk.
+greenspace_access_25: The number of restaurants within a 15-minute walk.
+
+`for (i in seq(5, 25, by = 5))` means you want to generate values for cutoffs that range from 5 to 25 minutes, increasing in increments of 5 minutes. You can get more columns by editing that line to get a wider range and/or increase by smaller increments.
+
+```{r, message=FALSE, results='hide'}
+for (i in seq(5, 60, by=5)) {
+  greenspace_access <- accessibility(r5r_core,
+                                   origins = weibo_clip,
+                                   destinations = grid_points,
+                                   opportunities_colname = "num_greenspace",
+                                   mode = "WALK",
+                                   decay_function = "step",
+                                   cutoffs = i,
+                                   verbose = FALSE) %>%
+    mutate(id = as.numeric(from_id)) %>%
+    select("id", "accessibility")
+
+  colnames(greenspace_access) <- c("id",
+                                   paste("greenspace_access_", i, sep = ""))
+
+  weibo_clip <- weibo_clip %>%
+    left_join(greenspace_access)
+}
+  
+
+
+```
+Now we can run the model for each of the threshold values and see which threshold gives the best model fit.
+
+It looks like the 15-minute threshold gives the best model fit.
+
+I recommend doing this individually for each of the amenities, and them use the variable that gives the best fit for each to combine into your final model.
+
+```{r}
+formula <- as.formula(paste("positive_p ~ greenspace_access_", 5, sep=""))
+model <- lm(formula, data = weibo_clip)
+
+fit <- tibble(threshold = 5,
+              fit = summary(model)$r.squared)
+
+for (i in seq(10, 60, by=5)) {
+  formula <- as.formula(paste("positive_p ~ greenspace_access_", i, sep=""))
+  model <- lm(formula, data = weibo_clip)
+
+fit <- rbind(fit, c(i, summary(model)$r.squared))
+
+  
+}
+fit
+
+ggplot(fit, aes(x = threshold, y = fit)) +
+  geom_point() +
+  theme_bw()
+```
+
+
+
 
 # accessibility from weibo posted to other ficilities
 
