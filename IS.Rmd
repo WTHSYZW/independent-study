@@ -21,6 +21,7 @@ library(tidyverse)
 library(sf)
 library(irr)
 library(ggthemes)
+library(jtools)
 ```
 
 
@@ -224,16 +225,6 @@ ggplot(fit, aes(x = threshold, y = fit)) +
 ```
 # accessibility from weibo posted to greenspace
 
-This will add five columns to weibo_clip:
-
-greenspace_access_5: The number of restaurants within a 5-minute walk.
-greenspace_access_10: The number of restaurants within a 10-minute walk.
-greenspace_access_15: The number of restaurants within a 15-minute walk.
-greenspace_access_20: The number of restaurants within a 15-minute walk.
-greenspace_access_25: The number of restaurants within a 15-minute walk.
-
-`for (i in seq(5, 25, by = 5))` means you want to generate values for cutoffs that range from 5 to 25 minutes, increasing in increments of 5 minutes. You can get more columns by editing that line to get a wider range and/or increase by smaller increments.
-
 ```{r, message=FALSE, results='hide'}
 for (i in seq(5, 60, by=5)) {
   greenspace_access <- accessibility(r5r_core,
@@ -257,11 +248,6 @@ for (i in seq(5, 60, by=5)) {
 
 
 ```
-Now we can run the model for each of the threshold values and see which threshold gives the best model fit.
-
-It looks like the 15-minute threshold gives the best model fit.
-
-I recommend doing this individually for each of the amenities, and them use the variable that gives the best fit for each to combine into your final model.
 
 ```{r}
 formula <- as.formula(paste("positive_p ~ greenspace_access_", 5, sep=""))
@@ -284,129 +270,285 @@ ggplot(fit, aes(x = threshold, y = fit)) +
   geom_point() +
   theme_bw()
 ```
-
-
-
-
-# accessibility from weibo posted to other ficilities
+# accessibility from weibo posted to school
 
 ```{r, message=FALSE, results='hide'}
-school_access <- accessibility(r5r_core,
+for (i in seq(5, 30, by=5)) {
+  school_access <- accessibility(r5r_core,
                                    origins = weibo_clip,
                                    destinations = grid_points,
                                    opportunities_colname = "num_school",
                                    mode = "WALK",
-                                   decay_function = "logistic",
-                                   cutoffs = 15,
+                                   decay_function = "step",
+                                   cutoffs = i,
                                    verbose = FALSE) %>%
-  rename("school_access" = "accessibility") %>%
-  mutate(id = as.numeric(from_id)) %>%
-  select("id", "school_access")
+    mutate(id = as.numeric(from_id)) %>%
+    select("id", "accessibility")
+
+  colnames(school_access) <- c("id",
+                                   paste("school_access_", i, sep = ""))
+
+  weibo_clip <- weibo_clip %>%
+    left_join(school_access)
+}
   
+formula <- as.formula(paste("positive_p ~ school_access_", 5, sep=""))
+model <- lm(formula, data = weibo_clip)
 
-weibo_clip <- weibo_clip %>%
-  left_join(school_access)
+fit <- tibble(threshold = 5,
+              fit = summary(model)$r.squared)
 
-hospital_access <- accessibility(r5r_core,
+for (i in seq(10, 30, by=5)) {
+  formula <- as.formula(paste("positive_p ~ school_access_", i, sep=""))
+  model <- lm(formula, data = weibo_clip)
+
+fit <- rbind(fit, c(i, summary(model)$r.squared))
+
+  
+}
+fit
+
+ggplot(fit, aes(x = threshold, y = fit)) +
+  geom_point() +
+  theme_bw()
+
+```
+
+# accessibility from weibo posted to hospital
+
+```{r, message=FALSE, results='hide'}
+for (i in seq(5, 30, by=5)) {
+  hospital_access <- accessibility(r5r_core,
                                    origins = weibo_clip,
                                    destinations = grid_points,
                                    opportunities_colname = "num_hospital",
                                    mode = "WALK",
-                                   decay_function = "logistic",
-                                   cutoffs = 15,
+                                   decay_function = "step",
+                                   cutoffs = i,
                                    verbose = FALSE) %>%
-  rename("hospital_access" = "accessibility") %>%
-  mutate(id = as.numeric(from_id)) %>%
-  select("id", "hospital_access")
+    mutate(id = as.numeric(from_id)) %>%
+    select("id", "accessibility")
+
+  colnames(hospital_access) <- c("id",
+                                   paste("hospital_access_", i, sep = ""))
+
+  weibo_clip <- weibo_clip %>%
+    left_join(hospital_access)
+}
   
+formula <- as.formula(paste("positive_p ~ hospital_access_", 5, sep=""))
+model <- lm(formula, data = weibo_clip)
 
-weibo_clip <- weibo_clip %>%
-  left_join(hospital_access)
+fit <- tibble(threshold = 5,
+              fit = summary(model)$r.squared)
 
-busstop_access <- accessibility(r5r_core,
+for (i in seq(10, 30, by=5)) {
+  formula <- as.formula(paste("positive_p ~ hospital_access_", i, sep=""))
+  model <- lm(formula, data = weibo_clip)
+
+fit <- rbind(fit, c(i, summary(model)$r.squared))
+
+  
+}
+fit
+
+ggplot(fit, aes(x = threshold, y = fit)) +
+  geom_point() +
+  theme_bw()
+
+```
+# accessibility from weibo posted to busstop
+
+```{r, message=FALSE, results='hide'}
+for (i in seq(5, 90, by=5)) {
+  busstop_access <- accessibility(r5r_core,
                                    origins = weibo_clip,
                                    destinations = grid_points,
                                    opportunities_colname = "num_busstop",
                                    mode = "WALK",
-                                   decay_function = "logistic",
-                                   cutoffs = 15,
+                                   decay_function = "step",
+                                   cutoffs = i,
                                    verbose = FALSE) %>%
-  rename("busstop_access" = "accessibility") %>%
-  mutate(id = as.numeric(from_id)) %>%
-  select("id", "busstop_access")
+    mutate(id = as.numeric(from_id)) %>%
+    select("id", "accessibility")
+
+  colnames(busstop_access) <- c("id",
+                                   paste("busstop_access_", i, sep = ""))
+
+  weibo_clip <- weibo_clip %>%
+    left_join(busstop_access)
+}
   
+formula <- as.formula(paste("positive_p ~ busstop_access_", 5, sep=""))
+model <- lm(formula, data = weibo_clip)
 
-weibo_clip <- weibo_clip %>%
-  left_join(busstop_access)
+fit <- tibble(threshold = 5,
+              fit = summary(model)$r.squared)
 
-greenspace_access <- accessibility(r5r_core,
-                                   origins = weibo_clip,
-                                   destinations = grid_points,
-                                   opportunities_colname = "num_greenspace",
-                                   mode = "WALK",
-                                   decay_function = "logistic",
-                                   cutoffs = 15,
-                                   verbose = FALSE) %>%
-  rename("greenspace_access" = "accessibility") %>%
-  mutate(id = as.numeric(from_id)) %>%
-  select("id", "greenspace_access")
+for (i in seq(10, 90, by=5)) {
+  formula <- as.formula(paste("positive_p ~ busstop_access_", i, sep=""))
+  model <- lm(formula, data = weibo_clip)
+
+fit <- rbind(fit, c(i, summary(model)$r.squared))
+
   
+}
+fit
 
-weibo_clip <- weibo_clip %>%
-  left_join(greenspace_access)
+ggplot(fit, aes(x = threshold, y = fit)) +
+  geom_point() +
+  theme_bw()
 
-leis_access <- accessibility(r5r_core,
+```
+# accessibility from weibo posted to leis
+
+```{r, message=FALSE, results='hide'}
+for (i in seq(5, 30, by=5)) {
+  leis_access <- accessibility(r5r_core,
                                    origins = weibo_clip,
                                    destinations = grid_points,
                                    opportunities_colname = "num_leis",
                                    mode = "WALK",
-                                   decay_function = "logistic",
-                                   cutoffs = 15,
+                                   decay_function = "step",
+                                   cutoffs = i,
                                    verbose = FALSE) %>%
-  rename("leis_access" = "accessibility") %>%
-  mutate(id = as.numeric(from_id)) %>%
-  select("id", "leis_access")
+    mutate(id = as.numeric(from_id)) %>%
+    select("id", "accessibility")
+
+  colnames(leis_access) <- c("id",
+                                   paste("leis_access_", i, sep = ""))
+
+  weibo_clip <- weibo_clip %>%
+    left_join(leis_access)
+}
   
+formula <- as.formula(paste("positive_p ~ leis_access_", 5, sep=""))
+model <- lm(formula, data = weibo_clip)
 
-weibo_clip <- weibo_clip %>%
-  left_join(leis_access)
+fit <- tibble(threshold = 5,
+              fit = summary(model)$r.squared)
 
-public_access <- accessibility(r5r_core,
+for (i in seq(10, 30, by=5)) {
+  formula <- as.formula(paste("positive_p ~ leis_access_", i, sep=""))
+  model <- lm(formula, data = weibo_clip)
+
+fit <- rbind(fit, c(i, summary(model)$r.squared))
+
+  
+}
+fit
+
+ggplot(fit, aes(x = threshold, y = fit)) +
+  geom_point() +
+  theme_bw()
+
+```
+# accessibility from weibo posted to public
+
+```{r, message=FALSE, results='hide'}
+for (i in seq(5, 30, by=5)) {
+  public_access <- accessibility(r5r_core,
                                    origins = weibo_clip,
                                    destinations = grid_points,
                                    opportunities_colname = "num_public",
                                    mode = "WALK",
-                                   decay_function = "logistic",
-                                   cutoffs = 15,
+                                   decay_function = "step",
+                                   cutoffs = i,
                                    verbose = FALSE) %>%
-  rename("public_access" = "accessibility") %>%
-  mutate(id = as.numeric(from_id)) %>%
-  select("id", "public_access")
+    mutate(id = as.numeric(from_id)) %>%
+    select("id", "accessibility")
+
+  colnames(public_access) <- c("id",
+                                   paste("public_access_", i, sep = ""))
+
+  weibo_clip <- weibo_clip %>%
+    left_join(public_access)
+}
   
+formula <- as.formula(paste("positive_p ~ public_access_", 5, sep=""))
+model <- lm(formula, data = weibo_clip)
 
-weibo_clip <- weibo_clip %>%
-  left_join(public_access)
+fit <- tibble(threshold = 5,
+              fit = summary(model)$r.squared)
 
-shopping_access <- accessibility(r5r_core,
+for (i in seq(10, 30, by=5)) {
+  formula <- as.formula(paste("positive_p ~ public_access_", i, sep=""))
+  model <- lm(formula, data = weibo_clip)
+
+fit <- rbind(fit, c(i, summary(model)$r.squared))
+
+  
+}
+fit
+
+ggplot(fit, aes(x = threshold, y = fit)) +
+  geom_point() +
+  theme_bw()
+
+```
+# accessibility from weibo posted to shopping
+
+```{r, message=FALSE, results='hide'}
+for (i in seq(5, 30, by=5)) {
+  shopping_access <- accessibility(r5r_core,
                                    origins = weibo_clip,
                                    destinations = grid_points,
                                    opportunities_colname = "num_shopping",
                                    mode = "WALK",
-                                   decay_function = "logistic",
-                                   cutoffs = 15,
+                                   decay_function = "step",
+                                   cutoffs = i,
                                    verbose = FALSE) %>%
-  rename("shopping_access" = "accessibility") %>%
-  mutate(id = as.numeric(from_id)) %>%
-  select("id", "shopping_access")
+    mutate(id = as.numeric(from_id)) %>%
+    select("id", "accessibility")
+
+  colnames(shopping_access) <- c("id",
+                                   paste("shopping_access_", i, sep = ""))
+
+  weibo_clip <- weibo_clip %>%
+    left_join(shopping_access)
+}
   
+formula <- as.formula(paste("positive_p ~ shopping_access_", 5, sep=""))
+model <- lm(formula, data = weibo_clip)
 
-weibo_clip <- weibo_clip %>%
-  left_join(shopping_access)
+fit <- tibble(threshold = 5,
+              fit = summary(model)$r.squared)
+
+for (i in seq(10, 30, by=5)) {
+  formula <- as.formula(paste("positive_p ~ shopping_access_", i, sep=""))
+  model <- lm(formula, data = weibo_clip)
+
+fit <- rbind(fit, c(i, summary(model)$r.squared))
+
+  
+}
+fit
+
+ggplot(fit, aes(x = threshold, y = fit)) +
+  geom_point() +
+  theme_bw()
+
 ```
-```{r}
-full_model <- lm(positive_p ~ restaurant_access + school_access + hospital_access + busstop_access + greenspace_access + leis_access + public_access + shopping_access, data = weibo_clip)
 
-summary(full_model)
+```{r}
+
+full1_model <- lm(positive_p ~ restaurant_access_15 + school_access_15 + hospital_access_15 + busstop_access_15 + greenspace_access_15 + leis_access_15 + public_access_15 + shopping_access_15, data = weibo_clip)
+
+summary(full1_model)
+
+
+full2_model <- lm(positive_p ~ restaurant_access_15 + school_access_25 + hospital_access_25 + busstop_access_70 + greenspace_access_25 + leis_access_20 + public_access_15 + shopping_access_25, data = weibo_clip)
+
+summary(full2_model)
+
+coeff_names <- c("Costant" = "(Intercept)")
+
+export_summs(full1_model, full2_model,
+             error_format = "(p = {p.value})",
+             error_pos = "same",
+             model.name = c ("Initial",
+                             "Refined"),
+             coef=coeff_names)
 ```
 # ```{r}
 # weibo_clip <- weibo_clip %>%
